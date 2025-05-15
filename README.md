@@ -1,2 +1,2 @@
-# Fusion-Server2
-This is the FastApi project for the backend of the Fusion App.
+# Fusion-Server
+this is the fast api project for Fusion-Server.
