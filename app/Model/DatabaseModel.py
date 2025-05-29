@@ -197,3 +197,11 @@ class Case(Base):
     EventType5 = Column(String(255))
     EventDescription5 = Column(String(255))
     OtherEvents = Column(Text)
+
+class Courts(Base):
+    __tablename__ = 'tbl_court'
+
+    id = Column(Integer, primary_key=True)
+    identifier = Column(String(255), unique=True)
+    courts = Column(String(255))
+    date = Column(String(255))

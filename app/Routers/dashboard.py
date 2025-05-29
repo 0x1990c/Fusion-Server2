@@ -10,7 +10,6 @@ from app.Utils.chatgpt import get_last_message
 from app.Utils.regular_send import send
 from app.Utils.Auth import get_current_user
 from app.Utils.regular_update import job, update_notification, update_database
-from app.Utils.regular_send import send_opt_in_phone
 from app.Utils.sendgrid import send_opt_in_email
 import app.Utils.database_handler as crud
 from app.Model.Settings import SettingsModel
@@ -219,19 +218,11 @@ async def set_opt_in_status_email(email: Annotated[str, Depends(get_current_user
 @router.get('/set-opt-in-status-phone')
 async def set_opt_in_status_phone(email: Annotated[str, Depends(get_current_user)], phone_id: int, opt_in_status_phone: int, db: Session = Depends(get_db)):
     print("dashboard - phone_id: ", phone_id)
-    phone = await crud.get_phone(db, phone_id)
-    if opt_in_status_phone == 1:
-        await send_opt_in_phone(phone.phone_number, phone_id, db)
-    # await crud.update_opt_in_status_phone(db, phone_id, opt_in_status_phone)
     return True
 
 @router.post('/send-optin-messages')
 async def send_optin_messages(payload: list[dict], db: Session = Depends(get_db)):
     print("dashboard - payload: ", payload)
-    for phone in payload:
-        phone_id = phone.get('id')
-        phone_number = phone.get('phone_number')
-        await send_opt_in_phone(phone_number, phone_id, db)
     return {"success": "true", "message": "Send SMS messages successfully"}
 
 @router.get('/confirm-opt-in-status')
@@ -311,9 +302,6 @@ async def add_customer(data: dict, email: Annotated[str, Depends(get_current_use
 
     print("twilio: ", "this is the main add phone number");
 
-    for phone in phones:
-        await send_opt_in_phone(phone.phone_number, phone.id, db)
-            
     return {"success": "true", "message": "Customer added successfully"}
 
 @router.post('/update-customer') 

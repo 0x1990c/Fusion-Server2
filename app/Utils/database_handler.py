@@ -1,12 +1,12 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, update, cast, Date
-from app.Model.DatabaseModel import Message, Project, MessageHistory, Report, User, Variables, Status, Customer, CustomerCategory, Phone, Case
+from app.Model.DatabaseModel import Message, Project, MessageHistory, Report, User, Variables, Status, Customer, CustomerCategory, Phone, Case, Courts
 from datetime import datetime
 from app.Model.MainTable import MainTableModel
 from app.Model.CaseModel import TimeRange
 from app.Model.CaseModel import FilterCondition
-
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -855,9 +855,9 @@ async def get_counties(db: AsyncSession,  timeRange: TimeRange):
 
     stmt = select(
         Case.id,
-        Case.DefendantAddressCity
-    ).filter(
-        Case.DefendantAddressCity != "",
+        Case.Court
+    ).distinct().filter(
+        Case.Court != "",
         Case.CaseStatusDate >= fromDate,
         Case.CaseStatusDate <= toDate
     )
@@ -947,3 +947,34 @@ async def get_last_query_date(db: AsyncSession):
         return None  # or handle as appropriate
     else:
         return last_date
+
+async def insert_courts(db: AsyncSession, items: list):
+    if len(items) < 2:
+        print("No data to insert.")
+        return False
+
+    try:
+        # Delete all rows using SQLAlchemy's expression API
+        await db.execute(delete(Courts))
+
+        # Create Court instances (skip header)
+        court_instances = [
+            Courts(identifier=item[0], courts=item[1], date=item[2])
+            for item in items[1:]
+        ]
+
+        db.add_all(court_instances)
+
+        await db.commit()  # One commit for both delete and insert
+        print(f"{len(court_instances)} records inserted successfully.")
+        return True
+
+    except Exception as e:
+        await db.rollback()
+        print(f"Error while inserting records: {e}")
+        return False
+    
+async def get_courts(db: AsyncSession):
+    stmt = select(Courts)
+    result = await db.execute(stmt)
+    return result.scalars().all()

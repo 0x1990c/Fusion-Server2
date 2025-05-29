@@ -1,22 +1,19 @@
-import os
+import requests
+
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from database import AsyncSessionLocal
 from app.Utils.Auth import authenticate_user, create_access_token, get_password_hash, get_current_user
 from app.Utils.sendgrid import send_mail, send_approve_email
-import secrets
-import os
-
 from app.Model.CaseModel import TimeRange
 from app.Model.CaseModel import FilterCondition
-
 import app.Utils.database_handler as crud
 import app.Utils.Auth as Auth
-
 from typing import Annotated
-
 from dotenv import load_dotenv
+
+from bs4 import BeautifulSoup
 
 load_dotenv()
 router = APIRouter()
@@ -43,6 +40,7 @@ async def getCounties(timeRange: TimeRange, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.post("/getData")
 async def getData(filterCondition: FilterCondition, db: Session = Depends(get_db)):
     try:
@@ -65,5 +63,43 @@ async def getLastQueryDate(db: Session = Depends(get_db)):
     try:
         queryDate = await crud.get_last_query_date(db)
         return {"query_date": queryDate}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/fetchCourts")
+async def fetchCourts(db: Session = Depends(get_db)):
+    try:
+        url = "https://www.in.gov/courts/help/odyssey-courts/"
+
+        response = requests.get(url)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+            tables = soup.find_all('table')
+
+            if len(tables) >= 2:
+                second_table = tables[1]  # Get the second table
+                data = []
+                for row in second_table.find_all('tr'):
+                    cols = row.find_all('td')
+                    if cols:
+                        data.append([col.get_text(strip=True) for col in cols])       
+                resultFlag = await crud.insert_courts(db, data)
+                return {"success": resultFlag}
+            else:
+                print("The second table was not found on the page.")
+                return {"success": False}
+        else:
+            print(f"Failed to retrieve data. Status code: {response.status_code}")
+            return {"success": False}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/getCourts")
+async def getCourts(db: Session = Depends(get_db)):
+    try:
+        courts = await crud.get_courts(db)
+        return {"courts": courts}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
