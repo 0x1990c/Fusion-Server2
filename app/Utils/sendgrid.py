@@ -1,6 +1,7 @@
 from sendgrid.helpers.mail import Mail, Email, To, Content, HtmlContent
 from sendgrid import SendGridAPIClient
 from sqlalchemy.orm import Session
+from app.Model.CaseModel import AlertAdminData
 from database import AsyncSessionLocal
 import app.Utils.database_handler as crud
 import os
@@ -291,3 +292,46 @@ async def send_approve_email(customer_email: str, db: Session):
     except Exception as e:
         print(f"Send mail Error: {e}")
         return False
+    
+async def alert_courts_admin(alertData: AlertAdminData, db: Session):
+    
+    print("alert_courts_admin: ", alertData)
+
+    try:
+
+        html_content = f"""
+            <html>
+                <body>
+                    <div>
+                        <p><strong>County Name:</strong> {alertData.county}</p>
+                        <p><strong>Court Name:</strong> {alertData.court}</p>
+                        <p><strong>User Email:</strong> {alertData.user}</p>
+                    </div>
+                </body>
+            </html>
+        """
+        api_key, from_mail = await get_api_key_and_from_mail(db)
+        print("sendgrid - from_email_obj1: ", from_mail)
+        # from_mail="jack.bear000@gmail.com"
+        sendgrid_client = SendGridAPIClient(api_key=api_key)
+
+        # to_email = "ceo@m2echicago.com"
+        # to_email = "serhiivernyhora@outlook.com"
+        to_email = "y.h.forever.212@gmail.com"
+
+        from_email_obj = Email(from_mail)  # Change to your verified sender
+        to_email_obj = To(to_email)  # Change to your recipient
+        html_content = HtmlContent(html_content)
+        print("sendgrid - from_email_obj: ", from_mail)
+        mail = Mail(from_email_obj, to_email_obj, 'New court seleced!', html_content)
+        mail_json = mail.get()
+        print("sendgrid - to_email: ", to_email)
+        response = sendgrid_client.client.mail.send.post(request_body=mail_json)
+        
+        if response.status_code == 202:
+            return True
+        else:
+            return False
+    except Exception as e:
+        print(f"Send mail Error: {e}")
+        return False    

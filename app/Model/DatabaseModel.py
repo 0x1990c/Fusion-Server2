@@ -205,3 +205,10 @@ class Courts(Base):
     identifier = Column(String(255), unique=True)
     courts = Column(String(255))
     date = Column(String(255))
+
+class Counties(Base):
+    __tablename__ = 'tbl_county'
+
+    id = Column(Integer, primary_key=True)
+    identifier = Column(String(255), unique=True)
+    county = Column(String(255))

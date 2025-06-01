@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, update, cast, Date
-from app.Model.DatabaseModel import Message, Project, MessageHistory, Report, User, Variables, Status, Customer, CustomerCategory, Phone, Case, Courts
+from app.Model.DatabaseModel import Message, Project, MessageHistory, Report, User, Variables, Status, Customer, CustomerCategory, Phone, Case, Courts, Counties
 from datetime import datetime
 from app.Model.MainTable import MainTableModel
 from app.Model.CaseModel import TimeRange
@@ -967,6 +967,29 @@ async def insert_courts(db: AsyncSession, items: list):
 
         await db.commit()  # One commit for both delete and insert
         print(f"{len(court_instances)} records inserted successfully.")
+        return True
+
+    except Exception as e:
+        await db.rollback()
+        print(f"Error while inserting records: {e}")
+        return False
+    
+async def insert_counties(db: AsyncSession, items: list):
+    if len(items) < 2:
+        print("No data to insert.")
+        return False
+
+    try:
+        # Delete all rows using SQLAlchemy's expression API
+        await db.execute(delete(Counties))
+
+        # Create Court instances (skip header)
+        for idx, item in enumerate(items):
+            county = Counties(identifier=str(idx+1).zfill(2), county=item['name'])
+            db.add(county)
+
+        await db.commit()  # One commit for both delete and insert
+        print(f"county records inserted successfully.")
         return True
 
     except Exception as e:

@@ -4,10 +4,10 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from database import AsyncSessionLocal
-from app.Utils.Auth import authenticate_user, create_access_token, get_password_hash, get_current_user
-from app.Utils.sendgrid import send_mail, send_approve_email
+from app.Utils.sendgrid import alert_courts_admin
 from app.Model.CaseModel import TimeRange
 from app.Model.CaseModel import FilterCondition
+from app.Model.CaseModel import AlertAdminData
 import app.Utils.database_handler as crud
 import app.Utils.Auth as Auth
 from typing import Annotated
@@ -96,10 +96,44 @@ async def fetchCourts(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/fetchCounties")
+async def fetchCounties(db: Session = Depends(get_db)):
+    try:
+        url = "https://www.in.gov/courts/local/"
+
+        response = requests.get(url)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            section = soup.find("section", id="645676")
+
+            counties = []
+            for a in section.find_all("a", href=True):
+                county_name = a.text.strip()
+                counties.append({"name": county_name})
+                
+            resultFlag = await crud.insert_counties(db, counties)
+            return {"success": resultFlag}
+        
+        else:
+            print(f"Failed to retrieve data. Status code: {response.status_code}")
+            return {"success": False}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @router.post("/getCourts")
 async def getCourts(db: Session = Depends(get_db)):
     try:
         courts = await crud.get_courts(db)
         return {"courts": courts}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@router.post("/alertCourtsToAdmin")
+async def alertCourtsToAdmin(alertAdminData: AlertAdminData, db: Session = Depends(get_db)):
+    try:
+        await alert_courts_admin(alertAdminData, db)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
