@@ -130,6 +130,13 @@ async def getCourts(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+@router.post("/getIndianaCounties")
+async def getIndianaCounties(db: Session = Depends(get_db)):
+    try:
+        counties = await crud.get_indiana_counties(db)
+        return {"counties": counties}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/alertCourtsToAdmin")
 async def alertCourtsToAdmin(alertAdminData: AlertAdminData, db: Session = Depends(get_db)):

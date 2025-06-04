@@ -1001,3 +1001,8 @@ async def get_courts(db: AsyncSession):
     stmt = select(Courts)
     result = await db.execute(stmt)
     return result.scalars().all()
+
+async def get_indiana_counties(db: AsyncSession):
+    stmt = select(Counties)
+    result = await db.execute(stmt)
+    return result.scalars().all()
