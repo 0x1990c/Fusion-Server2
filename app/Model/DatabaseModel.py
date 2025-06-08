@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Boolean, Text, JSON
+from sqlalchemy import create_engine, LargeBinary, Column, Integer, String, DateTime, ForeignKey, Boolean, Text, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -212,3 +212,36 @@ class Counties(Base):
     id = Column(Integer, primary_key=True)
     identifier = Column(String(255), unique=True)
     county = Column(String(255))
+
+class Template(Base):
+    __tablename__ = 'tbl_template'
+
+    id = Column(Integer, primary_key=True)
+    origin_name = Column(String(255), unique=True)
+    saved_name = Column(String(255))
+    saved_path = Column(String(255))
+    template_type = Column(String(255))
+    content = Column(LargeBinary)
+    user = Column(String(255))
+
+class CourtOwner(Base):
+    __tablename__ = 'tbl_court_owner'
+
+    id = Column(Integer, primary_key=True)
+    user =  Column(Integer)
+    court = Column(String(255))
+    date = Column(DateTime, default=datetime.utcnow)
+
+class ShortCodes(Base):
+    __tablename__ = 'tbl_shortcode'
+
+    id = Column(Integer, primary_key=True)
+    field = Column(String(255))
+    shortcode = Column(String(255))
+
+class Fields(Base):
+    __tablename__ = 'tbl_field'
+
+    id = Column(Integer, primary_key=True)
+    field = Column(String(255))
+

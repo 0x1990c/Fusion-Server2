@@ -1,0 +1,8 @@
+Dear [[defendant_name]],
+
+This letter is to inform you that a new filing has been made in your case [[case_number]] in the [[court]] on [[file_date]].
+
+You are required to appear by [[appear_by_date]].
+
+Regards,  
+Law Office

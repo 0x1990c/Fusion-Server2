@@ -18,3 +18,10 @@ class AlertAdminData(BaseModel):
     county: str
     court: str
     user: str
+
+class UserNameModel(BaseModel):
+    username: str
+
+class ShortcodeModel(BaseModel):
+    field: str
+    shortcode: str

@@ -322,7 +322,7 @@ async def alert_courts_admin(alertData: AlertAdminData, db: Session):
         to_email_obj = To(to_email)  # Change to your recipient
         html_content = HtmlContent(html_content)
         print("sendgrid - from_email_obj: ", from_mail)
-        mail = Mail(from_email_obj, to_email_obj, 'New court seleced!', html_content)
+        mail = Mail(from_email_obj, to_email_obj, 'New court selected!', html_content)
         mail_json = mail.get()
         print("sendgrid - to_email: ", to_email)
         response = sendgrid_client.client.mail.send.post(request_body=mail_json)

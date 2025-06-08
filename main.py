@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -15,7 +15,11 @@ from app.Routers import auth
 from app.Routers import socket
 from app.Routers import stripe
 from app.Routers import case
+from docx import Document
 import app.Utils.database_handler as crud
+from typing import List
+import shutil
+import os
 
 app = FastAPI()
 
@@ -32,7 +36,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

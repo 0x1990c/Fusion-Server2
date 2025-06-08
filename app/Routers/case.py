@@ -1,29 +1,150 @@
 import requests
 
 from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import UploadFile, File, Form
 from fastapi.responses import JSONResponse
+from fastapi.responses import PlainTextResponse
+
 from sqlalchemy.orm import Session
 from database import AsyncSessionLocal
 from app.Utils.sendgrid import alert_courts_admin
 from app.Model.CaseModel import TimeRange
 from app.Model.CaseModel import FilterCondition
 from app.Model.CaseModel import AlertAdminData
+from app.Model.CaseModel import  UserNameModel
+from app.Model.CaseModel import  ShortcodeModel
+from app.Model.MainTable import TemplateModel
+
 import app.Utils.database_handler as crud
 import app.Utils.Auth as Auth
 from typing import Annotated
 from dotenv import load_dotenv
 
 from bs4 import BeautifulSoup
+from docx import Document
+from typing import List
+import shutil
+import os
+import logging
+import traceback
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 router = APIRouter()
+
+UPLOAD_DIR = "upload"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Dependency to get the database session
 async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
 
+def read_docx(file_path):
+    doc = Document(file_path)
+    return "\n".join([para.text for para in doc.paragraphs])
 
+@router.post("/upload")
+# async def upload( letterFiles: List[UploadFile] = File(...), envelopeFiles: List[UploadFile] = File(...), username: str = Form(...), db: Session = Depends(get_db)):
+async def upload( letterFiles: List[UploadFile] = File(...), username: str = Form(...), db: Session = Depends(get_db)):
+    results = []
+
+    try:
+        # Create user-specific subfolder
+        user_folder = os.path.join(UPLOAD_DIR, username)
+        os.makedirs(user_folder, exist_ok=True)
+
+        # --- Letter Templates ---
+        for letterFile in letterFiles:
+            ext = os.path.splitext(letterFile.filename)[1].lower()
+            origin_name = letterFile.filename
+            saved_name = origin_name  # Now identical
+            saved_path = os.path.join(user_folder, saved_name)
+
+            # Save file
+            with open(saved_path, "wb") as buffer:
+                shutil.copyfileobj(letterFile.file, buffer)
+
+            # Extract human-readable content for response
+            if ext == ".txt":
+                with open(saved_path, "r", encoding="utf-8") as f:
+                    readable_content = f.read()
+            elif ext == ".docx":
+                readable_content = read_docx(saved_path)
+            else:
+                readable_content = "Unsupported file type"
+
+            # Read binary content for DB
+            with open(saved_path, "rb") as f:
+                binary_content = f.read()
+
+            results.append({
+                "filename": origin_name,
+                "saved_as": saved_name,
+                "content": readable_content
+            })
+
+            # Insert into DB
+            letter_data = TemplateModel(
+                origin_name=origin_name,
+                saved_name=saved_name,
+                saved_path=saved_path,
+                template_type="letter",
+                content=binary_content,
+                user=username
+            )
+            await crud.insert_template(db, letter_data)
+
+        # --- Envelope Templates ---
+        # for envelopeFile in envelopeFiles:
+        #     ext = os.path.splitext(envelopeFile.filename)[1].lower()
+        #     origin_name = envelopeFile.filename
+        #     saved_name = origin_name  # Now identical
+        #     saved_path = os.path.join(user_folder, saved_name)
+
+        #     # Save file
+        #     with open(saved_path, "wb") as buffer:
+        #         shutil.copyfileobj(envelopeFile.file, buffer)
+
+        #     # Extract human-readable content for response
+        #     if ext == ".txt":
+        #         with open(saved_path, "r", encoding="utf-8") as f:
+        #             readable_content = f.read()
+        #     elif ext == ".docx":
+        #         readable_content = read_docx(saved_path)
+        #     else:
+        #         readable_content = "Unsupported file type"
+
+        #     # Read binary content for DB
+        #     with open(saved_path, "rb") as f:
+        #         binary_content = f.read()
+
+        #     results.append({
+        #         "filename": origin_name,
+        #         "saved_as": saved_name,
+        #         "content": readable_content
+        #     })
+
+        #     # Insert into DB
+        #     envelope_data = TemplateModel(
+        #         origin_name=origin_name,
+        #         saved_name=saved_name,
+        #         saved_path=saved_path,
+        #         template_type="envelope",
+        #         content=binary_content,
+        #         user=username
+        #     )
+
+        #     await crud.insert_template(db, envelope_data)
+            
+        return {"success": True, "username": username, "files": results}
+
+    except Exception as e:
+        print("Error:", str(e))
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @router.post("/getCases")
 async def getCases(timeRange: TimeRange, db: Session = Depends(get_db)):
     try:
@@ -39,7 +160,6 @@ async def getCounties(timeRange: TimeRange, db: Session = Depends(get_db)):
         return {"counties": counties}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.post("/getData")
 async def getData(filterCondition: FilterCondition, db: Session = Depends(get_db)):
@@ -65,7 +185,6 @@ async def getLastQueryDate(db: Session = Depends(get_db)):
         return {"query_date": queryDate}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.post("/fetchCourts")
 async def fetchCourts(db: Session = Depends(get_db)):
@@ -142,5 +261,76 @@ async def getIndianaCounties(db: Session = Depends(get_db)):
 async def alertCourtsToAdmin(alertAdminData: AlertAdminData, db: Session = Depends(get_db)):
     try:
         await alert_courts_admin(alertAdminData, db)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/getSavedTemplates")
+async def getSavedTemplates(data: UserNameModel, db: Session = Depends(get_db)):
+    try:
+        username = data.username
+        templates = await crud.get_templates(db, username)
+        print("templates - email: ", templates)
+        return {"templates": templates}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/getSavedShortcode")
+async def getSavedShortcode(db: Session = Depends(get_db)):
+    try:
+        shortcodes = await crud.get_saved_shortcode(db)
+        return {"shortcodes": shortcodes}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/getFields")
+async def getFields(db: Session = Depends(get_db)):
+    try:
+        fields = await crud.get_fields(db)
+        return {"fields": fields}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/addNewShortcode")
+async def addNewShortcode(shortcodes: ShortcodeModel, db: Session = Depends(get_db)):
+    try:
+        await crud.add_new_shortcode(db, shortcodes)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/removeShortcode")
+async def removeShortcode(shortcodes: ShortcodeModel, db: Session = Depends(get_db)):
+    try:
+        await crud.remove_shortcode(db, shortcodes)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/removeSavedTemplate")
+async def removeSavedTemplate(templates: TemplateModel, db: Session = Depends(get_db)):
+    try:
+        await crud.remove_saved_templates(db, templates)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/getTemplateContent")
+async def getTemplateContent(template: TemplateModel, db: Session = Depends(get_db)):
+    try:
+        saved_path = template.saved_path
+        # templates = await crud.get_template_content(db, saved_path)
+        print("templates - saved_path: ", saved_path)
+        if not os.path.exists(saved_path):
+            return {"success" : False, "content": ''}
+        ext = os.path.splitext(saved_path)[1].lower()
+        if ext == ".txt":
+            with open(saved_path, "r", encoding="utf-8") as f:
+                return {"success" : True, "content": PlainTextResponse(f.read())}
+        elif ext == ".docx":
+            doc = Document(saved_path)
+            text = "\n".join([p.text for p in doc.paragraphs])
+            return {"success" : True, "content": PlainTextResponse(text)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

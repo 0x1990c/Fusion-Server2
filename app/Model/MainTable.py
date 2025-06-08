@@ -32,5 +32,11 @@ class PhoneModel(BaseModel):
     sent_timestamp: Optional[datetime] = None
     back_timestamp: Optional[datetime] = None
     
-    
+class TemplateModel(BaseModel):
+    origin_name: str
+    saved_name: str
+    saved_path: str
+    template_type: str
+    content: bytes  
+    user: str
     

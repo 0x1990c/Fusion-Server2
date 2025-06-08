@@ -18,10 +18,10 @@ from app.Model.ScrapingStatusModel import ScrapingStatusModel
 from app.Model.LastMessageModel import LastMessageModel
 from pydantic import EmailStr
 
+
 from copy import deepcopy
 from typing import Annotated
 from datetime import datetime
-import os
 import json
 
 from dotenv import load_dotenv

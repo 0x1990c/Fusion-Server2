@@ -1,15 +1,16 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, update, cast, Date
-from app.Model.DatabaseModel import Message, Project, MessageHistory, Report, User, Variables, Status, Customer, CustomerCategory, Phone, Case, Courts, Counties
+from app.Model.DatabaseModel import Message, Project, MessageHistory, Report, User, Variables, Status, Customer, CustomerCategory, Phone, Case, Courts, Counties, Template, CourtOwner, ShortCodes, Fields
 from datetime import datetime
-from app.Model.MainTable import MainTableModel
+from app.Model.MainTable import MainTableModel, TemplateModel
 from app.Model.CaseModel import TimeRange
-from app.Model.CaseModel import FilterCondition
+from app.Model.CaseModel import FilterCondition, ShortcodeModel
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
+import base64
 
 # Utility Functions for Asynchronous Execution
 
@@ -1006,3 +1007,94 @@ async def get_indiana_counties(db: AsyncSession):
     stmt = select(Counties)
     result = await db.execute(stmt)
     return result.scalars().all()
+
+async def insert_template(db: AsyncSession, item: TemplateModel):
+    
+    template = Template(
+        origin_name=item.origin_name,
+        saved_name=item.saved_name,
+        saved_path=item.saved_path,
+        template_type=item.template_type,  # or "envelope", depending on the use case
+        content=item.content,
+        user=item.user
+    )
+    db.add(template)
+    await db.commit()
+
+async def get_templates(db: AsyncSession, username: str):
+    print("username in handler - email: ", username)
+    
+    stmt = select(
+        Template.origin_name,
+        Template.saved_path,
+        Template.template_type,
+        Template.content
+    ).where(Template.user == username)
+
+    result = await db.execute(stmt)
+    rows = result.all()
+    
+    # Convert tuples to dictionaries
+    return [
+        {
+            "origin_name": row[0],
+            "saved_path": row[1],
+            "template_type": row[2],
+            "content": base64.b64encode(row[3]).decode("utf-8") if row[3] else None
+        }
+        for row in rows
+    ]
+
+async def save_paid_courts(db: AsyncSession, selected_courts: list, user_email: str):
+    
+    user_stmt = select(User).where(User.username == user_email)
+    user_result = await db.execute(user_stmt)
+    user = user_result.scalar_one_or_none()
+
+    if not user:
+        raise ValueError(f"User with email {user_email} not found")
+
+    court_objects = []
+
+    for court in selected_courts:
+        court_obj = CourtOwner(
+            user=user.id,
+            court=court['courtIdentifier'],
+            date=datetime.utcnow()
+        )
+        court_objects.append(court_obj)
+
+    db.add_all(court_objects)
+    await db.commit()
+
+async def get_saved_shortcode(db: AsyncSession):
+    stmt = select(ShortCodes)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+async def get_fields(db: AsyncSession):
+    stmt = select(Fields)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+
+async def add_new_shortcode(db: AsyncSession, item: ShortcodeModel):
+    
+    template = ShortCodes(
+        field=item.field,
+        shortcode=item.shortcode
+    )
+    db.add(template)
+    await db.commit()
+
+async def remove_shortcode(db: AsyncSession, item: ShortcodeModel):
+    # Find and delete record(s) matching the given field
+    stmt = delete(ShortCodes).where(ShortCodes.field == item.field)
+    await db.execute(stmt)
+    await db.commit()
+
+async def remove_saved_templates(db: AsyncSession, item: TemplateModel):
+    # Find and delete record(s) matching the given field
+    stmt = delete(Template).where(Template.origin_name == item.origin_name)
+    await db.execute(stmt)
+    await db.commit()

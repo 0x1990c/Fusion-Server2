@@ -49,8 +49,22 @@ async def checkout(model: StripeModel, db: Session = Depends(get_db)):
             success_url= YOUR_DOMAIN + "/main?success=true",
             cancel_url= YOUR_DOMAIN + "/main?success=false",
         )
-        print("checkout session:", checkout_session)
-        await crud.update_usertype(db, model.email, 1)
+        print("model.selectedCourts:", model.selectedCourts)
+
+        if checkout_session.get("livemode", False):
+            print("✅ Live mode session")
+            payment_status = checkout_session.get("payment_status")
+            if payment_status == "paid":
+                print("✅ Payment was successful")
+                await crud.update_usertype(db, model.email, 1)
+                await crud.save_paid_courts(db, model.selectedCourts, model.email)
+            else:
+                print(f"❌ Payment status: {payment_status}")
+        else:
+            print("🧪 Test mode session")
+            await crud.update_usertype(db, model.email, 1)
+            await crud.save_paid_courts(db, model.selectedCourts, model.email)
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     

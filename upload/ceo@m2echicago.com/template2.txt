@@ -1,0 +1,6 @@
+Dear [[defendant_name]],
+
+Your case ([[case_number]]) is scheduled in [[court]].
+
+Regards,  
+Your Legal Team
