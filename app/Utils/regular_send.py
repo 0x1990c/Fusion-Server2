@@ -50,7 +50,7 @@ async def send_sms_via_phone_number(phone_number: str, sms: str, db: Session):
     client = Client(twilioAccountSID, twilioAuthToken)
     print("sms - :", sms)
     if not sms:
-        sms = "from getDelmar.com"
+        sms = "from lawlettercreator.com"
     
     # Use a thread pool executor to run the Twilio client in a separate thread
     loop = asyncio.get_event_loop()

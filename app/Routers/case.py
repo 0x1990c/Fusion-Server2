@@ -14,6 +14,7 @@ from app.Model.CaseModel import AlertAdminData
 from app.Model.CaseModel import  UserNameModel
 from app.Model.CaseModel import  ShortcodeModel
 from app.Model.MainTable import TemplateModel
+from app.Model.MainTable import TemplateCaseModel
 
 import app.Utils.database_handler as crud
 import app.Utils.Auth as Auth
@@ -269,7 +270,6 @@ async def getSavedTemplates(data: UserNameModel, db: Session = Depends(get_db)):
     try:
         username = data.username
         templates = await crud.get_templates(db, username)
-        print("templates - email: ", templates)
         return {"templates": templates}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -322,6 +322,7 @@ async def getTemplateContent(template: TemplateModel, db: Session = Depends(get_
         saved_path = template.saved_path
         # templates = await crud.get_template_content(db, saved_path)
         print("templates - saved_path: ", saved_path)
+        saved_path = saved_path.replace("\\", "/");
         if not os.path.exists(saved_path):
             return {"success" : False, "content": ''}
         ext = os.path.splitext(saved_path)[1].lower()
@@ -334,3 +335,19 @@ async def getTemplateContent(template: TemplateModel, db: Session = Depends(get_
             return {"success" : True, "content": PlainTextResponse(text)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/getCompletedTemplate")
+async def getCompletedTemplate(data: TemplateCaseModel, db: Session = Depends(get_db)):
+    filled_template = await crud.get_completed_template(db, data)
+    return {"filled_template": filled_template}
+
+@router.post("/getPurchasedCourts")
+async def getPurchasedCourts(db: Session = Depends(get_db)):
+    try:
+        purchased_courts = await crud.get_purchased_courts(db)
+        print("templates - purchased_courts: ", purchased_courts)
+        return {"purchased_courts": purchased_courts}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    

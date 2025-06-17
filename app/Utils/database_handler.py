@@ -1,9 +1,9 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, update, cast, Date
+from sqlalchemy import func, update, cast, Date, distinct
 from app.Model.DatabaseModel import Message, Project, MessageHistory, Report, User, Variables, Status, Customer, CustomerCategory, Phone, Case, Courts, Counties, Template, CourtOwner, ShortCodes, Fields
 from datetime import datetime
-from app.Model.MainTable import MainTableModel, TemplateModel
+from app.Model.MainTable import MainTableModel, TemplateModel, TemplateCaseModel
 from app.Model.CaseModel import TimeRange
 from app.Model.CaseModel import FilterCondition, ShortcodeModel
 from sqlalchemy import delete
@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 import base64
+import re
+from collections import defaultdict
 
 # Utility Functions for Asynchronous Execution
 
@@ -1022,7 +1024,6 @@ async def insert_template(db: AsyncSession, item: TemplateModel):
     await db.commit()
 
 async def get_templates(db: AsyncSession, username: str):
-    print("username in handler - email: ", username)
     
     stmt = select(
         Template.origin_name,
@@ -1057,9 +1058,13 @@ async def save_paid_courts(db: AsyncSession, selected_courts: list, user_email: 
     court_objects = []
 
     for court in selected_courts:
+        match = re.match(r"(\d+)", court['courtIdentifier'])
+        countyID = match.group(1)
+
         court_obj = CourtOwner(
             user=user.id,
             court=court['courtIdentifier'],
+            county=countyID,
             date=datetime.utcnow()
         )
         court_objects.append(court_obj)
@@ -1098,3 +1103,74 @@ async def remove_saved_templates(db: AsyncSession, item: TemplateModel):
     stmt = delete(Template).where(Template.origin_name == item.origin_name)
     await db.execute(stmt)
     await db.commit()
+
+async def get_completed_template(db: AsyncSession, data: TemplateCaseModel):
+    case_stmt = select(Case).where(Case.id == data.case_id)
+    result = await db.execute(case_stmt)
+    case = result.scalar_one_or_none()
+
+    if not case:
+        return None
+    
+    case_dict = {col.name.lower(): getattr(case, col.name) for col in case.__table__.columns}
+    
+    shortcode_stmt = select(ShortCodes)
+    result = await db.execute(shortcode_stmt)
+    shortcodes = result.scalars().all()
+
+    filled_template = data.template_text
+
+    for shortcode in shortcodes:
+        field_key = shortcode.field.lower()
+        placeholder = shortcode.shortcode
+        value = case_dict.get(field_key, "")
+        filled_template = filled_template.replace(placeholder, str(value) if value is not None else "")
+
+    return filled_template
+
+
+async def get_purchased_courts(db: AsyncSession):
+    # Step 1: Fetch all data from tbl_court_owner
+    stmt = select(CourtOwner)
+    result = await db.execute(stmt)
+    court_owners = result.scalars().all()
+
+    if not court_owners:
+        return []
+
+    # Step 2: Extract unique court and county identifiers
+    court_ids = list(set(co.court for co in court_owners))
+    county_ids = list(set(co.county for co in court_owners))
+
+    # Step 3: Fetch courts from tbl_court by identifier
+    court_stmt = select(Courts).where(Courts.identifier.in_(court_ids))
+    court_result = await db.execute(court_stmt)
+    courts = court_result.scalars().all()
+    court_map = {c.identifier: c.courts for c in courts}
+
+    # Step 4: Fetch counties from tbl_county by identifier
+    county_stmt = select(Counties).where(Counties.identifier.in_(county_ids))
+    county_result = await db.execute(county_stmt)
+    counties = county_result.scalars().all()
+    county_map = {c.identifier: c.county for c in counties}  # id => name
+
+    # Step 5: Group courts under counties by identifier
+    grouped = defaultdict(list)
+    for co in court_owners:
+        county_id = co.county
+        court_id = co.court
+        grouped[county_id].append({
+            "identifier": court_id,
+            "courts": court_map.get(court_id, "Unknown Court")
+        })
+
+    # Step 6: Build final structure
+    result = []
+    for county_id, court_list in grouped.items():
+        result.append({
+            "identifier": county_id,  # county identifier (e.g., "02")
+            "name": county_map.get(county_id, "Unknown County"),  # name from tbl_county.county
+            "courts": court_list
+        })
+
+    return result

@@ -230,6 +230,7 @@ class CourtOwner(Base):
     id = Column(Integer, primary_key=True)
     user =  Column(Integer)
     court = Column(String(255))
+    county = Column(String(255))
     date = Column(DateTime, default=datetime.utcnow)
 
 class ShortCodes(Base):

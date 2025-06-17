@@ -55,7 +55,7 @@ async def get_last_message(db: Session, manager_name, manager_phone, manager_ema
     if not manager_name:
         manager_name = "Angela Bermudez"
         manager_phone = "+1 312 443 2120"
-        manager_email = "angelab@getdelmar.com"
+        manager_email = "angelab@lawlettercreator.com"
     
     instruction = f"""
         Now is {datetime.now()}

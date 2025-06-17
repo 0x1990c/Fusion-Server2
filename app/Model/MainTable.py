@@ -40,3 +40,6 @@ class TemplateModel(BaseModel):
     content: bytes  
     user: str
     
+class TemplateCaseModel(BaseModel):
+    template_text: str
+    case_id: int

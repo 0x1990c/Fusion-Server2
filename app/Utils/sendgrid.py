@@ -30,7 +30,7 @@ async def send_mail(text: str, subject: str, to_email: str, db: Session):
         # api_key, from_mail = await get_api_key_and_from_mail(db)
 
         api_key = sendgrid_api_key
-        from_mail = 'support@getdelmar.com'
+        from_mail = 'support@lawlettercreator.com'
         
         sendgrid_client = SendGridAPIClient(api_key)
         
@@ -102,7 +102,7 @@ async def forgot_password_func(url: str, subject: str, to_email: str, db: Sessio
         """
         # api_key, from_mail = await get_api_key_and_from_mail(db)
         api_key = sendgrid_api_key
-        from_mail = 'support@getdelmar.com'
+        from_mail = 'support@lawlettercreator.com'
 
         sendgrid_client = SendGridAPIClient(api_key=api_key)
         # to_email = "serhiivernyhora@outlook.com"
@@ -133,8 +133,8 @@ async def send_opt_in_email(customer_id: int, to_email: str, db: Session):
     print("sendgrid - customer_id: ", customer_id)
     print("sendgrid - to_email: ", to_email)
     try:
-        confirm_url = f"https://backend.getdelmar.com/api/v1/confirm-opt-in-status?customer_id={customer_id}&response=accept"
-        refuse_url = f"https://backend.getdelmar.com/api/v1/confirm-opt-in-status?customer_id={customer_id}&response=refuse"
+        confirm_url = f"https://backend.lawlettercreator.com/api/v1/confirm-opt-in-status?customer_id={customer_id}&response=accept"
+        refuse_url = f"https://backend.lawlettercreator.com/api/v1/confirm-opt-in-status?customer_id={customer_id}&response=refuse"
 
         # Create the HTML content for the email with two buttons
         html_content = f"""
@@ -212,8 +212,6 @@ async def send_approve_email(customer_email: str, db: Session):
     
     encoded_email = quote(customer_email)
     try:
-        # confirm_url = f"https://backend.getdelmar.com/api/v1/approved?email={encoded_email}&response=accept"
-        # refuse_url = f"https://backend.getdelmar.com/api/v1/approved?email={encoded_email}&response=refuse"
 
         confirm_url = f"https://backend.thequarrythornton.com/api/v1/approved?email={encoded_email}&response=accept"
         refuse_url =  f"https://backend.thequarrythornton.com/api/v1/approved?email={encoded_email}&response=refuse"

@@ -28,9 +28,9 @@ async def job(source: str):
     # Create an instance of AuthModel with your credentials
     auth_data = AuthModel(
         source=source,
-        builder_user='Angelab@getdelmar.com',
+        builder_user='Angelab@lawlettercreator.com',
         builder_pass='Liamb0218.',
-        xact_user='Angelab@getdelmar.com',
+        xact_user='Angelab@lawlettercreator.com',
         xact_pass='Liamb0218$'
     )
     
