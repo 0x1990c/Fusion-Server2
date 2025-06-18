@@ -13,6 +13,7 @@ class FilterCondition(BaseModel):
     selectedCaseTypes: List[str]
     selectedCourt: List[str]
     selectedCounty: List[str]
+    username: str
     
 class AlertAdminData(BaseModel):
     county: str

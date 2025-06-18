@@ -1,12 +1,13 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, update, cast, Date, distinct
+from sqlalchemy import func, update, cast, Date, distinct, or_, and_
 from app.Model.DatabaseModel import Message, Project, MessageHistory, Report, User, Variables, Status, Customer, CustomerCategory, Phone, Case, Courts, Counties, Template, CourtOwner, ShortCodes, Fields
 from datetime import datetime
 from app.Model.MainTable import MainTableModel, TemplateModel, TemplateCaseModel
 from app.Model.CaseModel import TimeRange
 from app.Model.CaseModel import FilterCondition, ShortcodeModel
 from sqlalchemy import delete
+from sqlalchemy.orm import joinedload
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -829,21 +830,25 @@ async def get_cases(db: AsyncSession, timeRange: TimeRange):
     fromDate = timeRange.fromDate.strftime("%m/%d/%Y")
     toDate = timeRange.toDate.strftime("%m/%d/%Y")
 
-    stmt = select(
-        Case.id,
-        Case.CaseCategoryKey,
-        Case.CaseCategoryGroup,
-        Case.CaseNumber,
-        Case.Court,
-        Case.CourtCode,
-        Case.CaseStatus,
-        Case.CaseStatusDate,
-        Case.CaseType,
-        Case.Style,
-        Case.DefendantAddressCity
-    ).filter(
-        Case.CaseStatusDate >= fromDate,
-        Case.CaseStatusDate <= toDate
+    stmt = (
+        select(
+            Case.id,
+            Case.CaseCategoryKey,
+            Case.CaseCategoryGroup,
+            Case.CaseNumber,
+            Case.Court,
+            Case.CourtCode,
+            Case.CaseStatus,
+            Case.CaseStatusDate,
+            Case.CaseType,
+            Case.Style,
+            Case.DefendantAddressCity
+        )
+        .filter(
+            Case.CaseStatusDate >= fromDate,
+            Case.CaseStatusDate <= toDate
+        )
+        .order_by(Case.CaseType)  # 👈 Sort here
     )
 
     result = await db.execute(stmt)
@@ -878,29 +883,65 @@ async def get_data(db: AsyncSession, filterCondition: FilterCondition):
     selectedCaseTypes = filterCondition.selectedCaseTypes
     selectedCourt = filterCondition.selectedCourt
     selectedCounty = filterCondition.selectedCounty
+    username = filterCondition.username
 
+    # Step 1: Get user ID
+    user_stmt = select(User.id).where(User.username == username)
+    user_result = await db.execute(user_stmt)
+    user_id = user_result.scalar()
+
+    if user_id is None:
+        return {"total_count": 0, "data": []}
+
+    # Step 2: Get list of court identifiers owned by user
+    court_stmt = select(CourtOwner.court).where(CourtOwner.user == user_id)
+    court_result = await db.execute(court_stmt)
+    user_courts = court_result.scalars().all()
+
+    if not user_courts:
+        return {"total_count": 0, "data": []}
+
+    # Step 2.5: Translate selectedCounty (names) to identifiers
+    county_ids = []
+    if selectedCounty:
+        county_stmt = select(Counties.identifier).where(Counties.county.in_(selectedCounty))
+        county_result = await db.execute(county_stmt)
+        county_ids = county_result.scalars().all()
+
+    # Step 3: Build filters
     filters = [
         Case.CaseStatusDate >= fromDate,
         Case.CaseStatusDate <= toDate,
+        or_(*[Case.CaseNumber.contains(court) for court in user_courts])
     ]
 
     if selectedCaseTypes:
         filters.append(Case.CaseType.in_(selectedCaseTypes))
     if selectedCourt:
         filters.append(Case.Court.in_(selectedCourt))
-    if selectedCounty:
-        filters.append(Case.DefendantAddressCity.in_(selectedCounty))
 
+    if county_ids:
+        filters.append(
+            or_(*[Case.CaseNumber.startswith(identifier) for identifier in county_ids])
+        )
+
+    # Step 4: Get total count
     count_stmt = select(func.count()).select_from(Case).filter(*filters)
-    result = await db.execute(count_stmt)  # Use await here
-    total_count = result.scalar()  # Get the scalar result
-    print("total_count:", total_count)
-    
+    count_result = await db.execute(count_stmt)
+    total_count = count_result.scalar()
+
+    # Step 5: Get paginated result
     stmt = select(Case).filter(*filters).limit(100).offset(offset * 100)
     result = await db.execute(stmt)
     rows = result.all()
     columns = result.keys()
-    return {"total_count" : total_count, "data" : [dict(zip(columns, row)) for row in rows]}
+
+    return {
+        "total_count": total_count,
+        "data": [dict(zip(columns, row)) for row in rows]
+    }
+
+
 
 async def get_data_merge(db: AsyncSession, filterCondition: FilterCondition):
     fromDate = filterCondition.fromDate.strftime("%m/%d/%Y")
@@ -1002,6 +1043,40 @@ async def insert_counties(db: AsyncSession, items: list):
     
 async def get_courts(db: AsyncSession):
     stmt = select(Courts)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+async def get_paid_courts(db: AsyncSession, username: str):
+    # Aliases
+    u = User
+    co = CourtOwner
+    c = Courts
+
+    # Build the query: Join CourtOwner → User and CourtOwner → Courts
+    stmt = (
+        select(c.courts)
+        .join_from(co, u, co.user == u.id)
+        .join(c, co.court == c.identifier)
+        .where(u.username == username)
+    )
+
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+async def get_paid_county(db: AsyncSession, username: str):
+    # Aliases
+    u = User
+    co = CourtOwner
+    c = Counties
+
+    # Select distinct counties only
+    stmt = (
+        select(distinct(c.county))
+        .join_from(co, u, co.user == u.id)
+        .join(c, co.county == c.identifier)
+        .where(u.username == username)
+    )
+
     result = await db.execute(stmt)
     return result.scalars().all()
 

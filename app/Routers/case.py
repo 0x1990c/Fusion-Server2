@@ -250,6 +250,26 @@ async def getCourts(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+@router.post("/getPaidCourts")
+async def getPaidCourts(data: UserNameModel, db: Session = Depends(get_db)):
+    try:
+        username = data.username
+        paid_courts = await crud.get_paid_courts(db, username)
+        print("templates - paid_courts: ", paid_courts)
+        return {"paid_courts": paid_courts}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/getPaidCounty")
+async def getPaidCounty(data: UserNameModel, db: Session = Depends(get_db)):
+    try:
+        username = data.username
+        paid_counties = await crud.get_paid_county(db, username)
+        return {"paid_counties": paid_counties}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/getIndianaCounties")
 async def getIndianaCounties(db: Session = Depends(get_db)):
     try:
