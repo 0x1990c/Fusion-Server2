@@ -293,8 +293,6 @@ async def send_approve_email(customer_email: str, db: Session):
     
 async def alert_courts_admin(alertData: AlertAdminData, db: Session):
     
-    print("alert_courts_admin: ", alertData)
-
     try:
 
         html_content = f"""
@@ -312,9 +310,9 @@ async def alert_courts_admin(alertData: AlertAdminData, db: Session):
         # from_mail="jack.bear000@gmail.com"
         sendgrid_client = SendGridAPIClient(api_key=api_key)
 
-        # to_email = "ceo@m2echicago.com"
+        to_email = "ceo@m2echicago.com"
         # to_email = "serhiivernyhora@outlook.com"
-        to_email = "y.h.forever.212@gmail.com"
+        # to_email = "y.h.forever.212@gmail.com"
 
         from_email_obj = Email(from_mail)  # Change to your verified sender
         to_email_obj = To(to_email)  # Change to your recipient

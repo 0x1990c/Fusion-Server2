@@ -1132,13 +1132,13 @@ async def save_paid_courts(db: AsyncSession, selected_courts: list, user_email: 
 
     court_objects = []
 
-    for court in selected_courts:
-        match = re.match(r"(\d+)", court['courtIdentifier'])
+    for court_identifier in selected_courts:
+        match = re.match(r"(\d+)", court_identifier)
         countyID = match.group(1)
 
         court_obj = CourtOwner(
             user=user.id,
-            court=court['courtIdentifier'],
+            court=court_identifier,
             county=countyID,
             date=datetime.utcnow()
         )
@@ -1246,6 +1246,36 @@ async def get_purchased_courts(db: AsyncSession):
             "identifier": county_id,  # county identifier (e.g., "02")
             "name": county_map.get(county_id, "Unknown County"),  # name from tbl_county.county
             "courts": court_list
+        })
+
+    return result
+
+
+async def get_counties_all_data(db: AsyncSession):
+    # Step 1: Fetch all counties and courts
+    counties_result = await db.execute(select(Counties))
+    counties = counties_result.scalars().all()
+
+    courts_result = await db.execute(select(Courts))
+    courts = courts_result.scalars().all()
+
+    # Step 2: Group courts by county identifier prefix (first two characters)
+    courts_by_county = defaultdict(list)
+    for court in courts:
+        if court.identifier and len(court.identifier) >= 2:
+            prefix = court.identifier[:2]
+            courts_by_county[prefix].append({
+                "identifier": court.identifier,
+                "courts": court.courts
+            })
+
+    # Step 3: Assemble final structure
+    result = []
+    for county in counties:
+        result.append({
+            "identifier": county.identifier,
+            "name": county.county,
+            "courts": courts_by_county.get(county.identifier, [])
         })
 
     return result

@@ -371,3 +371,10 @@ async def getPurchasedCourts(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+@router.post("/getCountiesAllData")
+async def getCountiesAllData(db: Session = Depends(get_db)):
+    try:
+        all_data = await crud.get_counties_all_data(db)
+        return {"all_data": all_data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
